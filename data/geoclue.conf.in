@@ -92,7 +92,7 @@ submission-nick=geoclue
 [compass]
 
 # Enable Compass
-enable=true
+enable=false
 
 # Static source configuration options
 #
