@@ -21,9 +21,9 @@ endif
 # https://gitlab.freedesktop.org/geoclue/geoclue/-/issues/136
 # See also: https://location.services.mozilla.com/api and
 # https://blog.mozilla.org/services/2019/09/03/a-new-policy-for-mozilla-location-service/
-ifeq ($(shell dpkg-vendor --query vendor),Debian)
-  MLS_API_KEY := -Dmozilla-api-key=484bfbac-6433-4492-aed3-16cc094eff93
-endif
+#ifeq ($(shell dpkg-vendor --query vendor),Debian)
+#  MLS_API_KEY := -Dmozilla-api-key=484bfbac-6433-4492-aed3-16cc094eff93
+#endif
 
 override_dh_auto_configure:
 	dh_auto_configure -- --libexecdir=/usr/libexec \
