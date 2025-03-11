@@ -22,9 +22,7 @@
 #ifndef GCLUE_HYBRIS_TYPES_H
 #define GCLUE_HYBRIS_TYPES_H
 
-G_BEGIN_DECLS
-
-typedef struct _GClueHybrisAccuracy GClueHybrisAccuracy;
+G_BEGIN_DECLS typedef struct _GClueHybrisAccuracy GClueHybrisAccuracy;
 typedef struct _GClueHybrisLocation GClueHybrisLocation;
 typedef struct _GClueHybrisSatelliteInfo GClueHybrisSatelliteInfo;
 
@@ -43,7 +41,7 @@ struct _GClueHybrisLocation {
         double direction;
         double climb;
 
-        GClueHybrisAccuracy* accuracy;
+        GClueHybrisAccuracy *accuracy;
 };
 
 struct _GClueHybrisSatelliteInfo {
@@ -54,5 +52,4 @@ struct _GClueHybrisSatelliteInfo {
 };
 
 G_END_DECLS
-
-#endif /* GCLUE_HYBRIS_TYPES_H */
+#endif                          /* GCLUE_HYBRIS_TYPES_H */

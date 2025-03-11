@@ -26,9 +26,7 @@
 #include <gio/gio.h>
 #include "gclue-location-source.h"
 
-G_BEGIN_DECLS
-
-GType gclue_hybris_source_get_type (void) G_GNUC_CONST;
+G_BEGIN_DECLS GType gclue_hybris_source_get_type (void) G_GNUC_CONST;
 
 #define GCLUE_TYPE_HYBRIS_SOURCE            (gclue_hybris_source_get_type ())
 #define GCLUE_HYBRIS_SOURCE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), GCLUE_TYPE_HYBRIS_SOURCE, GClueHybrisSource))
@@ -62,8 +60,7 @@ struct _GClueHybrisSourceClass {
         GClueLocationSourceClass parent_class;
 };
 
-GClueHybrisSource *gclue_hybris_source_get_singleton(void);
+GClueHybrisSource *gclue_hybris_source_get_singleton (void);
 
 G_END_DECLS
-
-#endif /* GCLUE_HYBRIS_SOURCE_H */
+#endif                          /* GCLUE_HYBRIS_SOURCE_H */

@@ -22,9 +22,7 @@
 #include "gclue-hybris-binder-types.h"
 #include "gclue-hybris-types.h"
 
-G_BEGIN_DECLS
-
-GType gclue_hybris_binder_get_type (void) G_GNUC_CONST;
+G_BEGIN_DECLS GType gclue_hybris_binder_get_type (void) G_GNUC_CONST;
 
 #define GCLUE_TYPE_HYBRIS_BINDER            (gclue_hybris_binder_get_type ())
 #define GCLUE_HYBRIS_BINDER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), GCLUE_TYPE_HYBRIS_BINDER, GClueHybrisBinder))
@@ -38,8 +36,8 @@ GType gclue_hybris_binder_get_type (void) G_GNUC_CONST;
  *
  * All the fields in the #GClueHybrisBinder structure are private and should never be accessed directly.
 **/
-typedef struct _GClueHybrisBinder        GClueHybrisBinder;
-typedef struct _GClueHybrisBinderClass   GClueHybrisBinderClass;
+typedef struct _GClueHybrisBinder GClueHybrisBinder;
+typedef struct _GClueHybrisBinderClass GClueHybrisBinderClass;
 typedef struct _GClueHybrisBinderPrivate GClueHybrisBinderPrivate;
 
 struct _GClueHybrisBinder {
@@ -58,8 +56,7 @@ struct _GClueHybrisBinderClass {
         GObjectClass parent_class;
 };
 
-GClueHybris* gclue_hybris_binder_get_singleton (void);
+GClueHybris *gclue_hybris_binder_get_singleton (void);
 
 G_END_DECLS
-
-#endif /* GCLUE_HYBRIS_BINDER_H */
+#endif                          /* GCLUE_HYBRIS_BINDER_H */
