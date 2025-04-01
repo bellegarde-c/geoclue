@@ -155,9 +155,7 @@ gclue_hybris_source_init (GClueHybrisSource *source)
 {
         GClueHybrisSourcePrivate *priv;
 
-        source->priv = G_TYPE_INSTANCE_GET_PRIVATE ((source),
-                                                    GCLUE_TYPE_HYBRIS_SOURCE,
-                                                    GClueHybrisSourcePrivate);
+        source->priv = gclue_hybris_source_get_instance_private (source);
         priv = source->priv;
 
         priv->cancellable = g_cancellable_new ();

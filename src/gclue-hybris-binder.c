@@ -847,9 +847,7 @@ getExtensionObject (GBinderRemoteReply *reply)
 void
 gclue_hybris_binder_init (GClueHybrisBinder *hbinder)
 {
-        hbinder->priv = G_TYPE_INSTANCE_GET_PRIVATE ((hbinder),
-                                                     GCLUE_TYPE_HYBRIS_BINDER,
-                                                     GClueHybrisBinderPrivate);
+        hbinder->priv = gclue_hybris_binder_get_instance_private (hbinder);
 }
 
 static void
