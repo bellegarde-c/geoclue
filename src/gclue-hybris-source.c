@@ -222,7 +222,7 @@ static GClueLocationSourceStopResult
 gclue_hybris_source_stop (GClueLocationSource *source)
 {
         GClueLocationSourceClass *base_class;
-        GClueLocationSourceStartResult base_result;
+        GClueLocationSourceStopResult base_result;
 
         g_return_val_if_fail (GCLUE_IS_HYBRIS_SOURCE (source), FALSE);
 
