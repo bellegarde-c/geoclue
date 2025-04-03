@@ -156,7 +156,7 @@ enum GnssCallbacks {
         GNSS_SET_SYSTEM_INFO_CB = 9
 };
 
-enum GnssDebudFunctions {
+enum GnssDebugFunctions {
         GNSS_DEBUG_GET_DEBUG_DATA = 1
 };
 
