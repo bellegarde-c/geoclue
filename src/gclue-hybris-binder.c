@@ -50,6 +50,8 @@ struct _GClueHybrisBinderPrivate {
         GBinderClient *m_clientAGnssRil;
         GBinderRemoteObject *m_remoteAGnssRil;
         GBinderLocalObject *m_callbackAGnssRil;
+
+        float m_gnssVersion;
 };
 
 G_DEFINE_TYPE_WITH_CODE (GClueHybrisBinder, gclue_hybris_binder,
@@ -141,7 +143,9 @@ enum GnssFunctions {
         GNSS_GET_EXTENSION_XTRA = 15,
         GNSS_GET_EXTENSION_GNSS_CONFIGURATION = 16,
         GNSS_GET_EXTENSION_GNSS_DEBUG = 17,
-        GNSS_GET_EXTENSION_GNSS_BATCHING = 18
+        GNSS_GET_EXTENSION_GNSS_BATCHING = 18,
+        GNSS_GET_EXTENSION_AGNSS_2_0 = 27,
+        GNSS_GET_EXTENSION_AGNSS_RIL_2_0 = 28
 };
 
 enum GnssCallbacks {
@@ -211,7 +215,7 @@ enum HybrisApnIpTypeEnum {
         HYBRIS_APN_IP_IPV4V6 = 3
 };
 
-#define GNSS_IFACE(v, x)       "android.hardware.gnss@" v "::" x
+#define GNSS_IFACE(v, x)       "android.hardware.gnss@" #v "::" x
 #define GNSS_REMOTE(v)         GNSS_IFACE  (v, "IGnss")
 #define GNSS_CALLBACK(v)       GNSS_IFACE  (v, "IGnssCallback")
 #define GNSS_DEBUG_REMOTE(v)   GNSS_IFACE  (v, "IGnssDebug")
@@ -228,6 +232,22 @@ enum HybrisApnIpTypeEnum {
 /*==========================================================================*
  * Implementation
  *==========================================================================*/
+
+static gboolean
+is_available (GBinderServiceManager* sm,
+              const char* service)
+{
+        GBinderRemoteObject *obj = gbinder_servicemanager_get_service_sync (sm,
+                                                                            service,
+                                                                            NULL);
+        if (obj == NULL) {
+                return FALSE;
+        }
+
+        gbinder_remote_object_unref (obj);
+
+        return TRUE;
+}
 
 static const void
 *geoclue_binder_gnss_decode_struct1 (GBinderReader *in,
@@ -325,7 +345,7 @@ geoclue_binder_gnss_callback (GBinderLocalObject   *obj,
         const char *iface = gbinder_remote_request_interface (req);
         GClueHybrisBinder *hbinder = (GClueHybrisBinder *) user_data;
 
-        if  (!g_strcmp0 (iface, GNSS_CALLBACK ("1.0"))) {
+        if  (!g_strcmp0 (iface, GNSS_CALLBACK (priv->m_gnssVersion))) {
                 GBinderReader reader;
 
                 gbinder_remote_request_init_reader (req, &reader);
@@ -522,7 +542,7 @@ geoclue_binder_gnss_xtra_callback (GBinderLocalObject   *obj,
         const char *iface = gbinder_remote_request_interface (req);
         //GClueHybrisBinder *hbinder =   (GClueHybrisBinder *)user_data;
 
-        if  (!g_strcmp0 (iface, GNSS_XTRA_CALLBACK ("1.0"))) {
+        if  (!g_strcmp0 (iface, GNSS_XTRA_CALLBACK (priv->m_gnssVersion))) {
                 GBinderReader reader;
 
                 gbinder_remote_request_init_reader (req, &reader);
@@ -554,7 +574,7 @@ GBinderLocalReply *geoclue_binder_agnss_callback (GBinderLocalObject *obj,
         const char *iface = gbinder_remote_request_interface (req);
         //GClueHybrisBinder *hbinder =   (GClueHybrisBinder *)user_data;
 
-        if  (!g_strcmp0 (iface, AGNSS_CALLBACK ("1.0"))) {
+        if  (!g_strcmp0 (iface, AGNSS_CALLBACK (priv->m_gnssVersion))) {
                 GBinderReader reader;
 
                 gbinder_remote_request_init_reader (req, &reader);
@@ -622,7 +642,7 @@ geoclue_binder_agnss_ril_callback (GBinderLocalObject   *obj,
         const char *iface = gbinder_remote_request_interface (req);
         //GClueHybrisBinder *hbinder =   (GClueHybrisBinder *)user_data;
 
-        if  (!g_strcmp0 (iface, AGNSS_RIL_CALLBACK ("1.0"))) {
+        if  (!g_strcmp0 (iface, AGNSS_RIL_CALLBACK (priv->m_gnssVersion))) {
                 GBinderReader reader;
 
                 gbinder_remote_request_init_reader (req, &reader);
@@ -661,7 +681,7 @@ geoclue_binder_gnss_ni_callback (GBinderLocalObject   *obj,
         const char *iface = gbinder_remote_request_interface (req);
         //GClueHybrisBinder *hbinder =   (GClueHybrisBinder *)user_data;
 
-        if  (!g_strcmp0 (iface, GNSS_NI_CALLBACK ("1.0"))) {
+        if  (!g_strcmp0 (iface, GNSS_NI_CALLBACK (priv->m_gnssVersion))) {
                 GBinderReader reader;
 
                 gbinder_remote_request_init_reader (req, &reader);
@@ -881,67 +901,73 @@ gclue_hybris_binder_gnssInit (GClueHybris *hybris)
 {
         GClueHybrisBinder *hbinder;
         GClueHybrisBinderPrivate *priv;
+        GBinderLocalRequest *req;
+        GBinderRemoteReply *reply;
+        int status = 0;
+        gboolean ret = FALSE;
+
         g_return_val_if_fail (GCLUE_IS_HYBRIS_BINDER (hybris), FALSE);
+
         hbinder = GCLUE_HYBRIS_BINDER (hybris);
         priv = hbinder->priv;
-
-        gboolean ret = FALSE;
 
         g_warning ("Initialising GNSS interface");
 
         priv->m_sm = gbinder_servicemanager_new (GNSS_BINDER_DEFAULT_DEV);
-        if (priv->m_sm) {
-                int status = 0;
 
-                /* Fetch remote reference from hwservicemanager */
-                priv->m_fqname = g_strconcat (GNSS_REMOTE ("1.0") "/default",
+        g_return_val_if_fail (priv->m_sm != NULL, FALSE);
+
+        /* Fetch remote reference from hwservicemanager */
+        priv->m_gnssVersion = 2.0;
+        priv->m_fqname = g_strconcat (GNSS_REMOTE (2.0) "/default", NULL);
+
+        if (!is_available (priv->m_sm, priv->m_fqname)) {
+                g_free (priv->m_fqname);
+                priv->m_gnssVersion = 1.0;
+                priv->m_fqname = g_strconcat (GNSS_REMOTE (priv->m_gnssVersion) "/default",
                                               NULL);
-                priv->m_remoteGnss =
-                    gbinder_servicemanager_get_service_sync (priv->m_sm,
-                                                             priv->m_fqname,
-                                                             &status);
-
-                if (priv->m_remoteGnss) {
-                        GBinderLocalRequest *req;
-                        GBinderRemoteReply *reply;
-
-                        /* get_service returns auto-released reference,
-                         * we need to add a reference of our own */
-                        gbinder_remote_object_ref (priv->m_remoteGnss);
-                        priv->m_clientGnss =
-                            gbinder_client_new (priv->m_remoteGnss,
-                                                GNSS_REMOTE ("1.0"));
-                        priv->m_death_id =
-                            gbinder_remote_object_add_death_handler
-                            (priv->m_remoteGnss, geoclue_binder_gnss_gnss_died,
-                             hybris);
-                        priv->m_callbackGnss =
-                            gbinder_servicemanager_new_local_object (priv->m_sm,
-                                                                     GNSS_CALLBACK ("1.0"),
-                                                                     geoclue_binder_gnss_callback,
-                                                                     hybris);
-
-                        /* IGnss::setCallback */
-                        req = gbinder_client_new_request (priv->m_clientGnss);
-                        gbinder_local_request_append_local_object (req,
-                                                                   priv->m_callbackGnss);
-                        reply =
-                            gbinder_client_transact_sync_reply
-                            (priv->m_clientGnss, GNSS_SET_CALLBACK, req,
-                             &status);
-
-                        if (!status) {
-                                ret = isReplySuccess (reply);
-                        }
-
-                        gbinder_local_request_unref (req);
-                        gbinder_remote_reply_unref (reply);
-                }
         }
 
-        if (!ret) {
-                g_warning ("Failed to initialise GNSS interface");
+        g_message ("Using %s", priv->m_fqname);
+
+        priv->m_remoteGnss =
+            gbinder_servicemanager_get_service_sync (priv->m_sm,
+                                                     priv->m_fqname,
+                                                     &status);
+
+        g_return_val_if_fail (priv->m_remoteGnss != NULL, FALSE);
+
+        /* get_service returns auto-released reference,
+         * we need to add a reference of our own */
+        gbinder_remote_object_ref (priv->m_remoteGnss);
+
+        priv->m_clientGnss = gbinder_client_new (priv->m_remoteGnss,
+                                                 GNSS_REMOTE (priv->m_gnssVersion));
+
+        priv->m_death_id =
+            gbinder_remote_object_add_death_handler (priv->m_remoteGnss,
+                                                     geoclue_binder_gnss_gnss_died,
+                                                     hybris);
+
+        priv->m_callbackGnss =
+            gbinder_servicemanager_new_local_object (priv->m_sm,
+                                                     GNSS_CALLBACK (priv->m_gnssVersion),
+                                                     geoclue_binder_gnss_callback,
+                                                     hybris);
+
+        /* IGnss::setCallback */
+        req = gbinder_client_new_request (priv->m_clientGnss);
+        gbinder_local_request_append_local_object (req,
+                                                   priv->m_callbackGnss);
+        reply = gbinder_client_transact_sync_reply (priv->m_clientGnss,
+                                                    GNSS_SET_CALLBACK,
+                                                    req,
+                                                    &status);
+
+        if (!status) {
+                ret = isReplySuccess (reply);
         }
+
         return ret;
 }
 
@@ -1202,7 +1228,7 @@ gclue_hybris_binder_gnssDebugInit (GClueHybris *hybris)
                         g_warning ("Initialising GNSS Debug interface");
                         priv->m_clientGnssDebug =
                             gbinder_client_new (priv->m_remoteGnssDebug,
-                                                GNSS_DEBUG_REMOTE ("1.0"));
+                                                GNSS_DEBUG_REMOTE (priv->m_gnssVersion));
                 }
         }
         gbinder_remote_reply_unref (reply);
@@ -1233,10 +1259,10 @@ gclue_hybris_binder_gnssNiInit (GClueHybris *hybris)
                         GBinderLocalRequest *req;
                         priv->m_clientGnssNi =
                             gbinder_client_new (priv->m_remoteGnssNi,
-                                                GNSS_NI_REMOTE ("1.0"));
+                                                GNSS_NI_REMOTE (priv->m_gnssVersion));
                         priv->m_callbackGnssNi =
                             gbinder_servicemanager_new_local_object (priv->m_sm,
-                                                                     GNSS_NI_CALLBACK ("1.0"),
+                                                                     GNSS_NI_CALLBACK (priv->m_gnssVersion),
                                                                      geoclue_binder_gnss_ni_callback,
                                                                      hybris);
 
@@ -1330,10 +1356,10 @@ gclue_hybris_binder_gnssXtraInit (GClueHybris *hybris)
                         GBinderLocalRequest *req;
                         priv->m_clientGnssXtra =
                             gbinder_client_new (priv->m_remoteGnssXtra,
-                                                GNSS_XTRA_REMOTE ("1.0"));
+                                                GNSS_XTRA_REMOTE (priv->m_gnssVersion));
                         priv->m_callbackGnssXtra =
                             gbinder_servicemanager_new_local_object (priv->m_sm,
-                                                                     GNSS_XTRA_REMOTE ("1.0"),
+                                                                     GNSS_XTRA_REMOTE (priv->m_gnssVersion),
                                                                      geoclue_binder_gnss_xtra_callback,
                                                                      hybris);
 
@@ -1402,55 +1428,69 @@ gclue_hybris_binder_aGnssInit (GClueHybris *hybris)
 {
         GClueHybrisBinder *hbinder;
         GClueHybrisBinderPrivate *priv;
-        g_return_if_fail (GCLUE_IS_HYBRIS_BINDER (hybris));
-        hbinder = GCLUE_HYBRIS_BINDER (hybris);
-        priv = hbinder->priv;
-
         GBinderRemoteReply *reply;
+        GBinderLocalRequest *req;
         int status = 0;
 
-        reply = gbinder_client_transact_sync_reply (priv->m_clientGnss,
-                                                    GNSS_GET_EXTENSION_AGNSS,
-                                                    NULL, &status);
+        g_return_if_fail (GCLUE_IS_HYBRIS_BINDER (hybris));
+        hbinder = GCLUE_HYBRIS_BINDER (hybris);
+
+        priv = hbinder->priv;
+
+        if (priv->m_gnssVersion == 2.0) {
+                reply = gbinder_client_transact_sync_reply (priv->m_clientGnss,
+                                                            GNSS_GET_EXTENSION_AGNSS_2_0,
+                                                            NULL, &status);
+        } else {
+                reply = gbinder_client_transact_sync_reply (priv->m_clientGnss,
+                                                            GNSS_GET_EXTENSION_AGNSS,
+                                                            NULL, &status);
+        }
+
+        if (status) {
+                g_warning ("Failed to initialize AGNSS interface");
+                return;
+        }
+        priv->m_remoteAGnss = getExtensionObject (reply);
+
+        if (!priv->m_remoteAGnss) {
+                g_warning ("Failed to initialize AGNSS interface");
+                goto cleanup;
+        }
+
+        g_warning ("Initialising AGNSS interface");
+
+        priv->m_clientAGnss = gbinder_client_new (priv->m_remoteAGnss,
+                                                  AGNSS_REMOTE(priv->m_gnssVersion));
+        priv->m_callbackAGnss =
+            gbinder_servicemanager_new_local_object (priv->m_sm,
+                                                     AGNSS_CALLBACK (priv->m_gnssVersion),
+                                                     geoclue_binder_agnss_callback,
+                                                     hybris);
+
+        /* IAGnss::setCallback */
+        req = gbinder_client_new_request (priv->m_clientAGnss);
+        gbinder_local_request_append_local_object (req,
+                                                   priv->m_callbackAGnss);
+
+        gbinder_remote_reply_unref (reply);
+        reply = gbinder_client_transact_sync_reply (priv->m_clientAGnss,
+                                                    AGNSS_SET_CALLBACK,
+                                                    req,
+                                                    &status);
 
         if (!status) {
-                priv->m_remoteAGnss = getExtensionObject (reply);
-
-                if (priv->m_remoteAGnss) {
-                        g_warning ("Initialising AGNSS interface");
-                        GBinderLocalRequest *req;
-                        priv->m_clientAGnss =
-                            gbinder_client_new (priv->m_remoteAGnss,
-                                                AGNSS_REMOTE("1.0"));
-                        priv->m_callbackAGnss =
-                            gbinder_servicemanager_new_local_object (priv->m_sm,
-                                                                     AGNSS_CALLBACK ("1.0"),
-                                                                     geoclue_binder_agnss_callback,
-                                                                     hybris);
-
-                        gbinder_remote_reply_unref (reply);
-
-                        /* IAGnss::setCallback */
-                        req = gbinder_client_new_request (priv->m_clientAGnss);
-                        gbinder_local_request_append_local_object (req,
-                                                                   priv->m_callbackAGnss);
-                        reply =
-                            gbinder_client_transact_sync_reply
-                            (priv->m_clientAGnss, AGNSS_SET_CALLBACK, req,
-                             &status);
-
-                        if (!status) {
-                                if (!gbinder_remote_reply_read_int32
-                                    (reply, &status)
-                                    || status != 0) {
-                                        g_warning
-                                            ("Initialising AGNSS interface failed %d",
-                                             status);
-                                }
-                        }
-                        gbinder_local_request_unref (req);
+                if (!gbinder_remote_reply_read_int32
+                    (reply, &status)
+                    || status != 0) {
+                        g_warning
+                            ("Initialising AGNSS interface failed %d",
+                             status);
                 }
         }
+        gbinder_local_request_unref (req);
+
+cleanup:
         gbinder_remote_reply_unref (reply);
 }
 
@@ -1548,55 +1588,64 @@ gclue_hybris_binder_aGnssRilInit (GClueHybris *hybris)
 {
         GClueHybrisBinder *hbinder;
         GClueHybrisBinderPrivate *priv;
+        GBinderRemoteReply *reply;
+        GBinderLocalRequest *req;
+        int status = 0;
+
         g_return_if_fail (GCLUE_IS_HYBRIS_BINDER (hybris));
         hbinder = GCLUE_HYBRIS_BINDER (hybris);
         priv = hbinder->priv;
-
-        GBinderRemoteReply *reply;
-        int status = 0;
 
         reply = gbinder_client_transact_sync_reply (priv->m_clientGnss,
                                                     GNSS_GET_EXTENSION_AGNSS_RIL,
                                                     NULL, &status);
 
+        if (status) {
+                g_warning ("Failed to initialize AGNSS RIL interface");
+                return;
+        }
+
+        priv->m_remoteAGnssRil = getExtensionObject (reply);
+
+        if (!priv->m_remoteAGnssRil) {
+                g_warning ("Failed to initialize AGNSS RIL interface");
+                goto cleanup;
+        }
+
+        g_warning ("Initialising AGNSS RIL interface");
+
+        priv->m_clientAGnssRil = gbinder_client_new (priv->m_remoteAGnssRil,
+                                                     AGNSS_RIL_REMOTE (priv->m_gnssVersion));
+        priv->m_callbackAGnssRil =
+            gbinder_servicemanager_new_local_object (priv->m_sm,
+                                                     AGNSS_RIL_CALLBACK (priv->m_gnssVersion),
+                                                     geoclue_binder_agnss_ril_callback,
+                                                     hybris);
+
+
+
+        /* IAGnssRil::setCallback */
+        req = gbinder_client_new_request (priv->m_clientAGnssRil);
+        gbinder_local_request_append_local_object (req,
+                                                   priv->m_callbackAGnssRil);
+
+        gbinder_remote_reply_unref (reply);
+        reply = gbinder_client_transact_sync_reply (priv->m_clientAGnssRil,
+                                                    AGNSS_RIL_SET_CALLBACK,
+                                                    req,
+                                                    &status);
+
         if (!status) {
-                priv->m_remoteAGnssRil = getExtensionObject (reply);
-
-                if (priv->m_remoteAGnssRil) {
-                        g_warning ("Initialising AGNSS RIL interface");
-                        GBinderLocalRequest *req;
-                        priv->m_clientAGnssRil =
-                            gbinder_client_new (priv->m_remoteAGnssRil,
-                                                AGNSS_RIL_REMOTE ("1.0"));
-                        priv->m_callbackAGnssRil =
-                            gbinder_servicemanager_new_local_object (priv->m_sm,
-                                                                     AGNSS_RIL_CALLBACK ("1.0"),
-                                                                     geoclue_binder_agnss_ril_callback,
-                                                                     hybris);
-
-                        gbinder_remote_reply_unref (reply);
-
-                        /* IAGnssRil::setCallback */
-                        req =
-                            gbinder_client_new_request (priv->m_clientAGnssRil);
-                        gbinder_local_request_append_local_object (req,
-                                                                   priv->m_callbackAGnssRil);
-                        reply =
-                            gbinder_client_transact_sync_reply
-                            (priv->m_clientAGnssRil, AGNSS_RIL_SET_CALLBACK,
-                             req, &status);
-
-                        if (!status) {
-                                if (!gbinder_remote_reply_read_int32
-                                    (reply, &status)
-                                    || status != 0) {
-                                        g_warning
-                                            ("Initialising AGNSS RIL interface failed %d",
-                                             status);
-                                }
-                        }
-                        gbinder_local_request_unref (req);
+                if (!gbinder_remote_reply_read_int32
+                    (reply, &status)
+                    || status != 0) {
+                        g_warning
+                            ("Initialising AGNSS RIL interface failed %d",
+                             status);
                 }
         }
+        gbinder_local_request_unref (req);
+
+cleanup:
         gbinder_remote_reply_unref (reply);
 }
