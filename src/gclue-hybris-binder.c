@@ -215,7 +215,7 @@ enum HybrisApnIpTypeEnum {
         HYBRIS_APN_IP_IPV4V6 = 3
 };
 
-#define GNSS_IFACE(v, x)       "android.hardware.gnss@" #v "::" x
+#define GNSS_IFACE(v, x)       "android.hardware.gnss@" v "::" x
 #define GNSS_REMOTE(v)         GNSS_IFACE  (v, "IGnss")
 #define GNSS_CALLBACK(v)       GNSS_IFACE  (v, "IGnssCallback")
 #define GNSS_DEBUG_REMOTE(v)   GNSS_IFACE  (v, "IGnssDebug")
